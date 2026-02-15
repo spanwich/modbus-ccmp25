@@ -1,0 +1,94 @@
+/*
+ * ICS Bidirectional Cross-Domain Gateway — STM32MP25x Assembly
+ *
+ * Board: Digi CCMP25-DVK (STM32MP255, dual Cortex-A35)
+ *
+ * This assembly includes only the software validation components
+ * (ICS_Inbound, ICS_Outbound) without VirtIO hardware or lwIP.
+ * The components boot, print init messages, and wait for notifications.
+ *
+ * Phase 1: Validate seL4 + CAmkES boots on real hardware with serial output.
+ * Phase 2: Add DWMAC Ethernet driver + lwIP for network traffic.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+import <std_connector.camkes>;
+import <global-connectors.camkes>;
+
+#define ICS_BUFFER_SIZE 65536
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/* ICS VALIDATION COMPONENTS — software-only, no hardware dependencies     */
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+/* ICS_Inbound - Validates external → internal traffic */
+component ICS_Inbound {
+    control;
+
+    /* Input from network driver (placeholder — no driver on Phase 1) */
+    dataport Buf(ICS_BUFFER_SIZE) in_dp;
+    consumes Notification in_ntfy;
+
+    /* Output to network driver (placeholder) */
+    dataport Buf(ICS_BUFFER_SIZE) out_dp;
+    emits Notification out_ntfy;
+}
+
+/* ICS_Outbound - Validates internal → external traffic */
+component ICS_Outbound {
+    control;
+
+    /* Input from network driver (placeholder) */
+    dataport Buf(ICS_BUFFER_SIZE) in_dp;
+    consumes Notification in_ntfy;
+
+    /* Output to network driver (placeholder) */
+    dataport Buf(ICS_BUFFER_SIZE) out_dp;
+    emits Notification out_ntfy;
+}
+
+assembly {
+    composition {
+        /* ═══ ICS Validation Instances ═══ */
+        component ICS_Inbound ics_inbound;
+        component ICS_Outbound ics_outbound;
+
+        /* ═══ Loopback connections ═══ */
+        /* Connect inbound output to outbound input and vice versa.
+         * This creates a closed loop so components can boot and
+         * exercise their dataport/notification interfaces without
+         * actual network hardware. */
+
+        connection seL4SharedData inbound_to_outbound_dp(
+            from ics_inbound.out_dp,
+            to ics_outbound.in_dp
+        );
+
+        connection seL4Notification inbound_to_outbound_ntfy(
+            from ics_inbound.out_ntfy,
+            to ics_outbound.in_ntfy
+        );
+
+        connection seL4SharedData outbound_to_inbound_dp(
+            from ics_outbound.out_dp,
+            to ics_inbound.in_dp
+        );
+
+        connection seL4Notification outbound_to_inbound_ntfy(
+            from ics_outbound.out_ntfy,
+            to ics_inbound.in_ntfy
+        );
+    }
+
+    configuration {
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ICS Validation Component Configuration                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        ics_inbound.priority = 150;
+        ics_inbound._priority = 150;
+
+        ics_outbound.priority = 150;
+        ics_outbound._priority = 150;
+    }
+}
