@@ -20,17 +20,27 @@ fi
 
 # Step 2: Copy seL4 image from SD to eMMC
 echo "Installing sel4.bin to eMMC partition 5..."
-updatefile linux mmc 2 sel4.bin sel4.bin
+fatload mmc 2 ${loadaddr} sel4.bin
 if test $? -ne 0; then
-    echo "ERROR: Failed to copy sel4.bin"
+    echo "ERROR: Failed to load sel4.bin from SD"
+    exit
+fi
+fatwrite mmc 0:5 ${loadaddr} sel4.bin ${filesize}
+if test $? -ne 0; then
+    echo "ERROR: Failed to write sel4.bin to eMMC"
     exit
 fi
 
 # Step 3: Copy seL4 boot.scr from SD to eMMC (overwrites Linux boot.scr)
 echo "Installing boot.scr to eMMC partition 5..."
-updatefile linux mmc 2 boot.scr boot.scr
+fatload mmc 2 ${loadaddr} boot.scr
 if test $? -ne 0; then
-    echo "ERROR: Failed to copy boot.scr"
+    echo "ERROR: Failed to load boot.scr from SD"
+    exit
+fi
+fatwrite mmc 0:5 ${loadaddr} boot.scr ${filesize}
+if test $? -ne 0; then
+    echo "ERROR: Failed to write boot.scr to eMMC"
     exit
 fi
 
