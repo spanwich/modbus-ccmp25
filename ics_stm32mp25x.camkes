@@ -22,6 +22,11 @@ import <global-connectors.camkes>;
 /* ICS VALIDATION COMPONENTS — software-only, no hardware dependencies     */
 /* ═══════════════════════════════════════════════════════════════════════ */
 
+/* WatchdogKicker - Pets IWDG1 via SMC to OP-TEE every 10s */
+component WatchdogKicker {
+    control;
+}
+
 /* ICS_Inbound - Validates external → internal traffic */
 component ICS_Inbound {
     control;
@@ -48,48 +53,14 @@ component ICS_Outbound {
     emits Notification out_ntfy;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════ */
-/* IWDG HARDWARE — MMIO only, no IRQ needed (we just kick, never handle  */
-/*                 the timeout interrupt)                                 */
-/* ═══════════════════════════════════════════════════════════════════════ */
-
-component IWDG1_HW {
-    hardware;
-    dataport Buf(0x1000) regs;
-}
-
-component IWDG2_HW {
-    hardware;
-    dataport Buf(0x1000) regs;
-}
-
-/* WatchdogKicker — periodically writes 0xAAAA to IWDG KR registers */
-component WatchdogKicker {
-    control;
-    dataport Buf(0x1000) iwdg1_regs;
-    dataport Buf(0x1000) iwdg2_regs;
-}
-
 assembly {
     composition {
+        /* ═══ Watchdog Kicker ═══ */
+        component WatchdogKicker wdt_kicker;
+
         /* ═══ ICS Validation Instances ═══ */
         component ICS_Inbound ics_inbound;
         component ICS_Outbound ics_outbound;
-
-        /* ═══ Watchdog Kicker ═══ */
-        component IWDG1_HW iwdg1_hw;
-        component IWDG2_HW iwdg2_hw;
-        component WatchdogKicker wdt_kicker;
-
-        connection seL4HardwareMMIO iwdg1_mmio(
-            from wdt_kicker.iwdg1_regs,
-            to iwdg1_hw.regs
-        );
-
-        connection seL4HardwareMMIO iwdg2_mmio(
-            from wdt_kicker.iwdg2_regs,
-            to iwdg2_hw.regs
-        );
 
         /* ═══ Loopback connections ═══ */
         /* Connect inbound output to outbound input and vice versa.
@@ -120,6 +91,13 @@ assembly {
 
     configuration {
         /* ═══════════════════════════════════════════════════════════════════ */
+        /* WatchdogKicker Configuration                                        */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        wdt_kicker.priority = 50;
+        wdt_kicker._priority = 50;
+        wdt_kicker.allowed_smc_functions = [0xbc000000];
+
+        /* ═══════════════════════════════════════════════════════════════════ */
         /* ICS Validation Component Configuration                             */
         /* ═══════════════════════════════════════════════════════════════════ */
         ics_inbound.priority = 150;
@@ -128,17 +106,5 @@ assembly {
         ics_outbound.priority = 150;
         ics_outbound._priority = 150;
 
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* IWDG Watchdog Kicker Configuration                                 */
-        /* ═══════════════════════════════════════════════════════════════════ */
-        /* IWDG1 @ 0x44010000, IWDG2 @ 0x44020000 */
-        iwdg1_hw.regs_paddr = 0x44010000;
-        iwdg1_hw.regs_size = 0x1000;
-        iwdg2_hw.regs_paddr = 0x44020000;
-        iwdg2_hw.regs_size = 0x1000;
-
-        /* Low priority — runs during idle time when ICS components block */
-        wdt_kicker.priority = 50;
-        wdt_kicker._priority = 50;
     }
 }

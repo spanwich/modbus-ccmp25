@@ -23,9 +23,5 @@ if test $? -ne 0; then
     bootm 0x90000000
 fi
 
-# Disable watchdog before jumping to seL4 (32s IWDG timeout otherwise)
-echo "Stopping watchdog..."
-wdt stop
-
 echo "Starting seL4 via bootm..."
 bootm 0x90000000 - 0x88000000

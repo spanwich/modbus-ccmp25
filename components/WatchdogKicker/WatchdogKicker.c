@@ -1,32 +1,49 @@
 /*
- * WatchdogKicker — Keeps STM32MP25x IWDG from resetting the board
- *
- * U-Boot starts the IWDG with a ~32s timeout. The STM32 IWDG is
- * hardware-unstoppable: once enabled, only a system reset clears it.
- * This component periodically writes 0xAAAA to the Key Register (KR)
- * of both IWDG1 and IWDG2 to reload the countdown.
+ * WatchdogKicker — Pet IWDG1 via SMC to OP-TEE
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <camkes.h>
+#include <sel4/sel4.h>
 #include <stdint.h>
 
-#define IWDG_KR_OFFSET  0x00
-#define KR_RELOAD       0xAAAA
+/* OP-TEE watchdog SMC */
+#define SMCWD_FUNC_ID   0xbc000000
+#define SMCWD_PET       3
 
-int run(void) {
-    volatile uint32_t *iwdg1_kr = (volatile uint32_t *)((uintptr_t)iwdg1_regs);
-    volatile uint32_t *iwdg2_kr = (volatile uint32_t *)((uintptr_t)iwdg2_regs);
+/*
+ * Yield iterations between pets. Each seL4_Yield() is a syscall roundtrip
+ * (~1us on Cortex-A35). 10M iterations ≈ a few seconds — well within the
+ * 32s IWDG timeout. Exact timing is unimportant; only the upper bound matters.
+ */
+#define PET_YIELD_COUNT  10000000
 
-    printf("WatchdogKicker: started (IWDG1@0x44010000, IWDG2@0x44020000)\n");
-
-    while (1) {
-        *iwdg1_kr = KR_RELOAD;
-        *iwdg2_kr = KR_RELOAD;
-
-        /* Busy-wait ~5s at ~1GHz. Crude but correct for Phase 1.
-         * seL4 preempts this for higher-priority ICS components. */
-        for (volatile int i = 0; i < 500000000; i++);
+int run(void)
+{
+    seL4_CPtr smc_cap = camkes_get_smc_cap(SMCWD_FUNC_ID);
+    if (!smc_cap) {
+        while (1) { seL4_Yield(); }
     }
+
+    seL4_ARM_SMCContext args = {0};
+    seL4_ARM_SMCContext result = {0};
+
+    /* Initial pet */
+    args.x0 = SMCWD_FUNC_ID;
+    args.x1 = SMCWD_PET;
+    seL4_ARM_SMC_Call(smc_cap, &args, &result);
+
+    volatile uint64_t count = 0;
+    while (1) {
+        seL4_Yield();
+        if (++count >= PET_YIELD_COUNT) {
+            args.x0 = SMCWD_FUNC_ID;
+            args.x1 = SMCWD_PET;
+            seL4_ARM_SMC_Call(smc_cap, &args, &result);
+            count = 0;
+        }
+    }
+
+    return 0;
 }

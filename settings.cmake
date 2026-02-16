@@ -53,6 +53,8 @@ elseif("${PLATFORM}" STREQUAL "stm32mp25x")
     set(SIMULATION OFF CACHE BOOL "" FORCE)
     # Phase 1: no network — lwIP disabled
     set(LibLwip OFF CACHE BOOL "" FORCE)
+    # SMC calls for IWDG watchdog petting via OP-TEE
+    set(KernelAllowSMCCalls ON CACHE BOOL "" FORCE)
 endif()
 
 set(KernelRootCNodeSizeBits 18 CACHE STRING "" FORCE)

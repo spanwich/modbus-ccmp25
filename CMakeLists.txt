@@ -153,13 +153,11 @@ elseif("${KernelARMPlatform}" STREQUAL "stm32mp25x")
             components/include
     )
 
-    # WatchdogKicker (IWDG service — stm32mp25x only)
+    # WatchdogKicker (pets IWDG1 via OP-TEE SMC)
     DeclareCAmkESComponent(
         WatchdogKicker
         SOURCES
             components/WatchdogKicker/WatchdogKicker.c
-        INCLUDES
-            components/include
     )
 
     DeclareCAmkESRootserver(ics_stm32mp25x.camkes)
