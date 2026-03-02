@@ -20,13 +20,18 @@ WatchdogKicker — pets IWDG1 via SMC to OP-TEE every ~10s
 
 | File | Purpose |
 |------|---------|
-| `ics_stm32mp25x.camkes` | CAmkES assembly (stm32mp25x platform) |
+| `ics_stm32mp25x.camkes` | Native-only CAmkES assembly (no VM) |
+| `ics_vm_stm32mp25x.camkes` | VM-enabled assembly (Linux VM + native components) |
 | `settings.cmake` | Platform config, KernelAllowSMCCalls |
-| `CMakeLists.txt` | Component declarations |
+| `CMakeLists.txt` | Component declarations (native + VM builds) |
+| `stm32mp25x/devices.camkes` | VM platform config (RAM, DTB, MMIO) |
+| `linux/stm32mp25x-guest.dts` | Minimal guest device tree for VM |
+| `plat_include/stm32mp25x/plat/vmlinux.h` | VMM platform config (IRQs, GIC, keep-devices) |
 | `components/ICS_Inbound/` | External→internal validator |
 | `components/ICS_Outbound/` | Internal→external validator |
 | `components/WatchdogKicker/` | IWDG SMC kicker |
 | `deploy/` | SD card install/restore scripts |
+| `docs/vm-migration-reference.md` | VM migration planning reference |
 
 ## Platform Rules
 
@@ -38,6 +43,8 @@ See `../../.claude/ccwmp255-sel4-rules.md` for hard-won platform-specific rules:
 
 ## Build
 
+### Native-only (no VM, default)
+
 ```bash
 cd camkes-vm-examples
 rm -rf build-modbus-ccmp25 && mkdir build-modbus-ccmp25 && cd build-modbus-ccmp25
@@ -47,6 +54,25 @@ cmake -G Ninja -DPLATFORM=stm32mp25x \
   ../projects/modbus_ccmp25
 bash ast.pickle.cmd && bash camkes-gen.cmake.cmd
 cmake -G Ninja -DPLATFORM=stm32mp25x \
+  -DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
+  -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake \
+  ../projects/modbus_ccmp25
+ninja
+```
+
+### VM-enabled (Linux VM + native components)
+
+Requires: `linux/linux-Image`, `linux/rootfs.cpio.gz` in project directory.
+
+```bash
+cd camkes-vm-examples
+rm -rf build-modbus-vm && mkdir build-modbus-vm && cd build-modbus-vm
+cmake -G Ninja -DPLATFORM=stm32mp25x -DSTM32MP25X_VM=ON \
+  -DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
+  -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake \
+  ../projects/modbus_ccmp25
+bash ast.pickle.cmd && bash camkes-gen.cmake.cmd
+cmake -G Ninja -DPLATFORM=stm32mp25x -DSTM32MP25X_VM=ON \
   -DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
   -DCMAKE_TOOLCHAIN_FILE=../kernel/gcc.cmake \
   ../projects/modbus_ccmp25

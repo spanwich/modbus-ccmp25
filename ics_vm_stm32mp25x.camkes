@@ -1,0 +1,122 @@
+/*
+ * ICS Bidirectional Cross-Domain Gateway — STM32MP25x VM Assembly
+ *
+ * Board: Digi CCMP25-DVK (STM32MP255, dual Cortex-A35)
+ *
+ * This assembly adds a Linux VM guest alongside the native CAmkES
+ * validation components. The VM hosts the DWMAC Ethernet driver via
+ * device passthrough, providing TCP/IP networking to the ICS gateway.
+ *
+ * Architecture:
+ *   seL4 (EL2)
+ *     ├── FileServer           — serves Linux kernel/DTB/initrd
+ *     ├── VM vm0 (Linux EL1)   — runs DWMAC driver, TCP/IP stack
+ *     ├── WatchdogKicker       — pets IWDG1 via OP-TEE SMC
+ *     ├── ICS_Inbound          — validates external→internal MODBUS
+ *     └── ICS_Outbound         — validates internal→external MODBUS
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#include <configurations/vm.h>
+
+import <std_connector.camkes>;
+import <global-connectors.camkes>;
+import <vm-connectors.camkes>;
+import <VM_Arm/VM.camkes>;
+import <devices.camkes>;
+
+#define ICS_BUFFER_SIZE 65536
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/* NATIVE CAMKES COMPONENTS                                                */
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+/* WatchdogKicker - Pets IWDG1 via SMC to OP-TEE every 10s */
+component WatchdogKicker {
+    control;
+}
+
+/* ICS_Inbound - Validates external → internal traffic */
+component ICS_Inbound {
+    control;
+
+    /* Input from VM (placeholder — VirtIO bridge TBD) */
+    dataport Buf(ICS_BUFFER_SIZE) in_dp;
+    consumes Notification in_ntfy;
+
+    /* Output to VM (placeholder — VirtIO bridge TBD) */
+    dataport Buf(ICS_BUFFER_SIZE) out_dp;
+    emits Notification out_ntfy;
+}
+
+/* ICS_Outbound - Validates internal → external traffic */
+component ICS_Outbound {
+    control;
+
+    /* Input from VM (placeholder) */
+    dataport Buf(ICS_BUFFER_SIZE) in_dp;
+    consumes Notification in_ntfy;
+
+    /* Output to VM (placeholder) */
+    dataport Buf(ICS_BUFFER_SIZE) out_dp;
+    emits Notification out_ntfy;
+}
+
+assembly {
+    composition {
+        /* ═══ VM Infrastructure ═══ */
+        VM_GENERAL_COMPOSITION_DEF()    /* FileServer fserv */
+        VM_COMPOSITION_DEF(0)           /* VM vm0 + connections */
+        connection seL4VMDTBPassthrough vm_dtb(from vm0.dtb_self, to vm0.dtb);
+
+        /* ═══ Native CAmkES Components ═══ */
+        component WatchdogKicker wdt_kicker;
+        component ICS_Inbound ics_inbound;
+        component ICS_Outbound ics_outbound;
+
+        /* ═══ Loopback connections (Phase 1: no VM↔native bridge yet) ═══ */
+        connection seL4SharedData inbound_to_outbound_dp(
+            from ics_inbound.out_dp,
+            to ics_outbound.in_dp
+        );
+
+        connection seL4Notification inbound_to_outbound_ntfy(
+            from ics_inbound.out_ntfy,
+            to ics_outbound.in_ntfy
+        );
+
+        connection seL4SharedData outbound_to_inbound_dp(
+            from ics_outbound.out_dp,
+            to ics_inbound.in_dp
+        );
+
+        connection seL4Notification outbound_to_inbound_ntfy(
+            from ics_outbound.out_ntfy,
+            to ics_inbound.in_ntfy
+        );
+    }
+
+    configuration {
+        /* ═══ VM Configuration ═══ */
+        VM_GENERAL_CONFIGURATION_DEF()
+        VM_CONFIGURATION_DEF(0)
+
+        vm0.num_extra_frame_caps = 0;
+        vm0.extra_frame_map_address = 0;
+        vm0.cnode_size_bits = 23;
+        vm0.simple_untyped24_pool = 12;
+
+        /* ═══ WatchdogKicker — must run to prevent 32s IWDG reset ═══ */
+        wdt_kicker.priority = 50;
+        wdt_kicker._priority = 50;
+        wdt_kicker.allowed_smc_functions = [0xbc000000];
+
+        /* ═══ ICS Validation Components ═══ */
+        ics_inbound.priority = 150;
+        ics_inbound._priority = 150;
+
+        ics_outbound.priority = 150;
+        ics_outbound._priority = 150;
+    }
+}

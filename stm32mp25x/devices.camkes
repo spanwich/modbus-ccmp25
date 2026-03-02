@@ -1,0 +1,81 @@
+/*
+ * Platform configuration for STM32MP25x (Digi CCMP25-DVK)
+ *
+ * SoC: STM32MP255, dual Cortex-A35, AArch64
+ * Board: Digi ConnectCore MP25 Development Kit
+ *
+ * Memory layout:
+ *   DDR base: 0x80000000 (2GB on CCMP25-DVK)
+ *   We allocate the upper 256MB for the Linux VM guest:
+ *     0x90000000 - 0x9FFFFFFF = 256MB VM RAM
+ *   seL4 + CAmkES native components use lower DDR
+ *
+ * UART: USART2 @ 0x400e0000 (debug console, 115200 baud)
+ * NIC:  DWMAC @ 0x482c0000 (Synopsys DWMAC 5.10a, passthrough)
+ * GIC:  @ 0x4ac10000 (GICC), 0x4ac20000 (GICV)
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#include <configurations/vm.h>
+
+/*
+ * VM RAM: 256MB starting at 0x90000000
+ * This avoids conflict with seL4 kernel and native CAmkES components
+ * which are loaded at the DDR base (0x80000000+).
+ */
+#define VM_INITRD_MAX_SIZE 0x1900000    /* 25 MB */
+#define VM_RAM_BASE        0x90000000
+#define VM_RAM_SIZE        0x10000000   /* 256 MB */
+#define VM_RAM_OFFSET      0x00000000
+#define VM_DTB_ADDR        0x9F000000   /* Near top of VM RAM */
+#define VM_INITRD_ADDR     0x9D700000   /* Below DTB */
+
+assembly {
+    composition {}
+    configuration {
+
+        vm0.linux_address_config = {
+            "linux_ram_base"       : VAR_STRINGIZE(VM_RAM_BASE),
+            "linux_ram_paddr_base" : VAR_STRINGIZE(VM_RAM_BASE),
+            "linux_ram_size"       : VAR_STRINGIZE(VM_RAM_SIZE),
+            "linux_ram_offset"     : VAR_STRINGIZE(VM_RAM_OFFSET),
+            "dtb_addr"             : VAR_STRINGIZE(VM_DTB_ADDR),
+            "initrd_max_size"      : VAR_STRINGIZE(VM_INITRD_MAX_SIZE),
+            "initrd_addr"          : VAR_STRINGIZE(VM_INITRD_ADDR)
+        };
+
+        vm0.linux_image_config = {
+            "linux_bootcmdline" : "console=ttySTM1,115200 earlycon=stm32,0x400e0000",
+            "linux_stdout"      : "/soc/uart@400e0000",
+        };
+
+        vm0.num_vcpus = 2;  /* Dual Cortex-A35 */
+
+        /*
+         * Device tree nodes to passthrough to the VM guest.
+         * USART2: debug serial console
+         * DWMAC: Ethernet NIC (passthrough for Linux driver reuse)
+         */
+        vm0.dtb = dtb([
+            {"path": "/soc/uart@400e0000"},       /* USART2 — debug console */
+            {"path": "/soc/eth1@482c0000"},          /* DWMAC 5.10a — NIC passthrough */
+        ]);
+
+        /*
+         * MMIO regions granted to the VM as untyped capabilities.
+         * Format: "address:log2size" (size = 2^log2size bytes)
+         *
+         * GIC Virtual CPU interface: 0x4ac20000, 8KB (2^13)
+         * USART2:  0x400e0000, 4KB (2^12)
+         * DWMAC:   0x482c0000, 16KB (2^14)
+         * VM RAM:  0x90000000, 256MB (2^28)
+         */
+        vm0.untyped_mmios = [
+            "0x4ac20000:13",    /* GICV — GIC Virtual CPU interface */
+            "0x400e0000:12",    /* USART2 — debug serial */
+            "0x482c0000:14",    /* DWMAC — Ethernet controller */
+            "0x90000000:28",    /* VM RAM region (256MB) */
+        ];
+    }
+}

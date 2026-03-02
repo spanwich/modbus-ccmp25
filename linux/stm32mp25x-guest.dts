@@ -1,0 +1,105 @@
+/*
+ * Minimal guest device tree for Linux VM on STM32MP25x under seL4 hypervisor.
+ *
+ * This DTS defines the subset of hardware exposed to the Linux guest:
+ *   - USART2 (debug console, passthrough)
+ *   - DWMAC Ethernet (passthrough for NIC access)
+ *   - GIC (virtual interface managed by seL4)
+ *   - ARMv8 generic timer (virtual)
+ *   - PSCI for CPU management
+ *
+ * The VMM (seL4 VM component) will merge/override /memory and /chosen
+ * nodes at runtime based on devices.camkes configuration.
+ *
+ * SPDX-License-Identifier: (GPL-2.0-or-later OR BSD-2-Clause)
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "digi,ccmp25-dvk", "st,stm32mp257";
+	model = "seL4 VM Guest on Digi CCMP25-DVK";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	/*
+	 * /memory and /chosen are injected by the seL4 VMM at boot time.
+	 * The VMM sets ram_base, ram_size, initrd location, and bootargs
+	 * from the linux_address_config in devices.camkes.
+	 */
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			compatible = "arm,cortex-a35";
+			device_type = "cpu";
+			reg = <0>;
+			enable-method = "psci";
+		};
+	};
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <1 13 0xf08>,  /* Secure phys timer PPI 13 */
+			     <1 14 0xf08>,  /* Non-secure phys timer PPI 14 */
+			     <1 11 0xf08>,  /* Virtual timer PPI 11 */
+			     <1 10 0xf08>;  /* Hypervisor timer PPI 10 */
+		arm,no-tick-in-suspend;
+	};
+
+	intc: interrupt-controller@4ac00000 {
+		compatible = "arm,cortex-a7-gic";
+		#interrupt-cells = <3>;
+		interrupt-controller;
+		reg = <0x0 0x4ac10000 0x0 0x1000>,   /* GICD */
+		      <0x0 0x4ac20000 0x0 0x2000>,   /* GICC */
+		      <0x0 0x4ac40000 0x0 0x2000>,   /* GICH */
+		      <0x0 0x4ac60000 0x0 0x2000>;   /* GICV */
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x0 0x0 0x80000000>;
+
+		/*
+		 * USART2 — debug serial console (passthrough)
+		 * RIFSC ID 32: must be allowed by OP-TEE/TF-A firewall config
+		 */
+		usart2: serial@400e0000 {
+			compatible = "st,stm32h7-uart";
+			reg = <0x400e0000 0x400>;
+			interrupts = <0 115 4>;  /* GIC_SPI 115, IRQ_TYPE_LEVEL_HIGH */
+			status = "okay";
+		};
+
+		/*
+		 * DWMAC Ethernet — NIC passthrough
+		 * RIFSC ID 60: must be allowed by OP-TEE/TF-A firewall config
+		 *
+		 * Note: Clock and DMA properties stripped for minimal DTS.
+		 * The full Digi yocto-linux kernel will need the complete
+		 * clock tree. These can be added once the kernel boots.
+		 */
+		eth1: ethernet@482c0000 {
+			compatible = "st,stm32mp25-dwmac", "snps,dwmac-5.10a";
+			reg = <0x482c0000 0x4000>;
+			interrupts = <0 130 4>;  /* GIC_SPI 130, IRQ_TYPE_LEVEL_HIGH */
+			interrupt-names = "macirq";
+			snps,mixed-burst;
+			snps,pbl = <2>;
+			snps,txqos = <7>;
+			snps,rxqos = <7>;
+			snps,tso;
+			status = "okay";
+		};
+	};
+};

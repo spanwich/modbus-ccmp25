@@ -44,17 +44,18 @@ if("${PLATFORM}" STREQUAL "qemu-arm-virt")
     set(SIMULATION ON CACHE BOOL "Generate QEMU simulation script" FORCE)
     set(LibLwip ON CACHE BOOL "" FORCE)
 elseif("${PLATFORM}" STREQUAL "stm32mp25x")
-    # Digi CCMP25-DVK: Cortex-A35 AArch64, no VirtIO
+    # Digi CCMP25-DVK: Cortex-A35 AArch64
     set(KernelArch "arm" CACHE STRING "" FORCE)
     set(KernelSel4Arch "aarch64" CACHE STRING "" FORCE)
     set(AARCH64 ON CACHE BOOL "" FORCE)
     set(KernelArmHypervisorSupport ON CACHE BOOL "" FORCE)
     set(VirtioNetSupport OFF CACHE BOOL "" FORCE)
     set(SIMULATION OFF CACHE BOOL "" FORCE)
-    # Phase 1: no network — lwIP disabled
     set(LibLwip OFF CACHE BOOL "" FORCE)
     # SMC calls for IWDG watchdog petting via OP-TEE
     set(KernelAllowSMCCalls ON CACHE BOOL "" FORCE)
+    # VM guest support: Linux VM with initrd rootfs
+    set(VmInitRdFile ON CACHE BOOL "" FORCE)
 endif()
 
 set(KernelRootCNodeSizeBits 18 CACHE STRING "" FORCE)

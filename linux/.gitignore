@@ -1,0 +1,5 @@
+# Built kernel and rootfs images (not checked in — built locally)
+linux-Image
+linux-dtb
+rootfs.cpio.gz
+yocto-linux/
