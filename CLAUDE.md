@@ -32,6 +32,9 @@ WatchdogKicker — pets IWDG1 via SMC to OP-TEE every ~10s
 | `components/WatchdogKicker/` | IWDG SMC kicker |
 | `deploy/` | SD card install/restore scripts |
 | `docs/vm-migration-reference.md` | VM migration planning reference |
+| `docs/rifsc_dwmac_investigation.md` | RIFSC/DWMAC access analysis (ETH1/ETH2 confirmed NSEC) |
+| `docs/build-readiness-analysis.md` | Build resource verification (native + VM) |
+| `docs/gap_analysis_20260302.md` | Implementation readiness assessment against target architecture |
 
 ## Platform Rules
 

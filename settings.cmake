@@ -85,13 +85,21 @@ set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(KernelDebugBuild ON CACHE BOOL "" FORCE)
 
 find_package(camkes-tool REQUIRED)
-camkes_tool_setup_camkes_build_environment()
 
-find_file(GLOBAL_COMPONENTS_PATH global-components.cmake
-    PATHS ${project_dir}/global-components/
-    CMAKE_FIND_ROOT_PATH_BOTH)
-mark_as_advanced(FORCE GLOBAL_COMPONENTS_PATH)
-if("${GLOBAL_COMPONENTS_PATH}" STREQUAL "GLOBAL_COMPONENTS_PATH-NOTFOUND")
-    message(FATAL_ERROR "Failed to find global-components.cmake")
+# VM builds (QEMU or stm32mp25x+VM) need camkes-arm-vm, which internally
+# calls camkes_tool_setup_camkes_build_environment() plus VM-specific setup.
+# Native-only builds just need camkes-tool setup directly.
+if("${PLATFORM}" STREQUAL "qemu-arm-virt" OR STM32MP25X_VM)
+    find_package(camkes-arm-vm REQUIRED)
+    camkes_arm_vm_setup_arm_vm_environment()
+else()
+    camkes_tool_setup_camkes_build_environment()
+    find_file(GLOBAL_COMPONENTS_PATH global-components.cmake
+        PATHS ${project_dir}/global-components/
+        CMAKE_FIND_ROOT_PATH_BOTH)
+    mark_as_advanced(FORCE GLOBAL_COMPONENTS_PATH)
+    if("${GLOBAL_COMPONENTS_PATH}" STREQUAL "GLOBAL_COMPONENTS_PATH-NOTFOUND")
+        message(FATAL_ERROR "Failed to find global-components.cmake")
+    endif()
+    include(${GLOBAL_COMPONENTS_PATH})
 endif()
-include(${GLOBAL_COMPONENTS_PATH})
