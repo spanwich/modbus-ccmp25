@@ -35,6 +35,8 @@ WatchdogKicker — pets IWDG1 via SMC to OP-TEE every ~10s
 | `docs/rifsc_dwmac_investigation.md` | RIFSC/DWMAC access analysis (ETH1/ETH2 confirmed NSEC) |
 | `docs/build-readiness-analysis.md` | Build resource verification (native + VM) |
 | `docs/gap_analysis_20260302.md` | Implementation readiness assessment against target architecture |
+| `docs/rcc_clock_investigation.md` | RCC RIFSC analysis (SEC/CID1, clocks OFF at boot) |
+| `docs/optee_smc_interfaces.md` | Complete OP-TEE SMC/PTA/SCMI reference for seL4 |
 
 ## Platform Rules
 
