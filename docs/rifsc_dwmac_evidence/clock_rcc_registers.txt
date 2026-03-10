@@ -1,0 +1,59 @@
+DWMAC Clock and RCC Register Summary for STM32MP25x
+====================================================
+
+Sources:
+  - linux/drivers/clk/stm32/stm32mp25_rcc.h
+  - linux/drivers/clk/stm32/clk-stm32mp25.c
+  - linux/include/dt-bindings/clock/st,stm32mp25-rcc.h
+
+RCC Base: 0x44200000 (from DTS)
+
+ETH1 Clocks (all in RCC_ETH1CFGR, offset 0x7F0)
+-------------------------------------------------
+  Bit 0:  ETH1RST     - Reset control
+  Bit 1:  ETH1MACEN   - MAC core clock enable (CK_ETH1_MAC, clock ID 329)
+  Bit 4:  ETH1STPEN   - Stop clock enable (CK_ETH1_STP, clock ID 333)
+  Bit 5:  ETH1EN      - Kernel clock enable (CK_KER_ETH1, clock ID 316)
+  Bit 8:  ETH1TXEN    - TX clock enable (CK_ETH1_TX, clock ID 328)
+  Bit 10: ETH1RXEN    - RX clock enable (CK_ETH1_RX, clock ID 327)
+
+  PTP clock (CK_KER_ETH1PTP, clock ID 318) is from FLEXGEN_56 divider
+
+ETH2 Clocks (all in RCC_ETH2CFGR, offset 0x7F4)
+-------------------------------------------------
+  Bit 0:  ETH2RST     - Reset control
+  Bit 1:  ETH2MACEN   - MAC core clock enable (CK_ETH2_MAC, clock ID 332)
+  Bit 4:  ETH2STPEN   - Stop clock enable (CK_ETH2_STP, clock ID 334)
+  Bit 5:  ETH2EN      - Kernel clock enable (CK_KER_ETH2, clock ID 317)
+  Bit 8:  ETH2TXEN    - TX clock enable (CK_ETH2_TX, clock ID 331)
+  Bit 10: ETH2RXEN    - RX clock enable (CK_ETH2_RX, clock ID 330)
+
+  PTP clock (CK_KER_ETH2PTP, clock ID 319) is from FLEXGEN_56 (shared with ETH1)
+
+SYSCFG ETHCR Registers
+-----------------------
+  ETH1: SYSCFG + 0x3000  (selects PHY interface mode for ETH1)
+  ETH2: SYSCFG + 0x3400  (selects PHY interface mode for ETH2)
+
+  Bit 0: ETH_REF_CLK_SEL  - 50MHz ref clock select (RMII)
+  Bit 1: ETH_CLK_SEL      - 125MHz clock select (RGMII)
+  Bit 2: ETH_PTP_CLK_SEL  - PTP clock from RCC
+  Bit 4: ETH_SEL_RGMII    - RGMII mode select
+  Bit 6: ETH_SEL_RMII     - RMII mode select
+
+Clock Management Under seL4
+-----------------------------
+Option A: SCMI via OP-TEE
+  - OP-TEE acts as SCMI server for clock management
+  - Linux uses SCMI protocol to request clock enable/disable
+  - seL4 would need SCMI client implementation
+
+Option B: Direct RCC Access
+  - Write RCC_ETH1CFGR directly to enable clocks
+  - Risk: RCC may be RIFSC-protected (must verify RCC RIFSC ID)
+  - Simpler but bypasses OP-TEE clock management
+
+Option C: Chainload from U-Boot/Linux
+  - If clocks are already enabled when seL4 boots, no action needed
+  - Depends on boot chain leaving clocks on
+  - Fragile: any clock gating in U-Boot/OP-TEE breaks this
