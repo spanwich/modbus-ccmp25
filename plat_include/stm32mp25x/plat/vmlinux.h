@@ -39,7 +39,6 @@ static const int free_plat_interrupts[] = {
 static const char *plat_keep_devices[] = {
     "/timer",
     "/psci",
-    "/arm-pmu",
 };
 
 /* Nodes to keep but mark as disabled */

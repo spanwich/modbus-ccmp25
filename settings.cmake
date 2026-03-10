@@ -84,6 +84,9 @@ ApplyCommonReleaseVerificationSettings(${RELEASE} FALSE)
 set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(KernelDebugBuild ON CACHE BOOL "" FORCE)
 
+# No USB host controller on STM32MP25x VM passthrough
+set(LibUSB OFF CACHE BOOL "" FORCE)
+
 find_package(camkes-tool REQUIRED)
 
 # VM builds (QEMU or stm32mp25x+VM) need camkes-arm-vm, which internally

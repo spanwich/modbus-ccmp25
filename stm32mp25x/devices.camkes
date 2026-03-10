@@ -12,7 +12,7 @@
  *
  * UART: USART2 @ 0x400e0000 (debug console, 115200 baud)
  * NIC:  DWMAC @ 0x482c0000 (Synopsys DWMAC 5.10a, passthrough)
- * GIC:  @ 0x4ac10000 (GICC), 0x4ac20000 (GICV)
+ * GIC:  GICD @ 0x4ac10000, GICV @ 0x4ac60000
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -46,8 +46,8 @@ assembly {
         };
 
         vm0.linux_image_config = {
-            "linux_bootcmdline" : "console=ttySTM1,115200 earlycon=stm32,0x400e0000",
-            "linux_stdout"      : "/soc/uart@400e0000",
+            "linux_bootcmdline" : "console=ttySTM0,115200 earlycon",
+            "linux_stdout"      : "/soc/serial@400e0000:115200",
         };
 
         vm0.num_vcpus = 2;  /* Dual Cortex-A35 */
@@ -58,7 +58,7 @@ assembly {
          * DWMAC: Ethernet NIC (passthrough for Linux driver reuse)
          */
         vm0.dtb = dtb([
-            {"path": "/soc/uart@400e0000"},       /* USART2 — debug console */
+            {"path": "/soc/serial@400e0000"},     /* USART2 — debug console */
             {"path": "/soc/eth1@482c0000"},          /* DWMAC 5.10a — NIC passthrough */
         ]);
 
@@ -66,13 +66,13 @@ assembly {
          * MMIO regions granted to the VM as untyped capabilities.
          * Format: "address:log2size" (size = 2^log2size bytes)
          *
-         * GIC Virtual CPU interface: 0x4ac20000, 8KB (2^13)
+         * GICV:    0x4ac60000, 8KB (2^13) — Virtual CPU interface for VM
          * USART2:  0x400e0000, 4KB (2^12)
          * DWMAC:   0x482c0000, 16KB (2^14)
          * VM RAM:  0x90000000, 256MB (2^28)
          */
         vm0.untyped_mmios = [
-            "0x4ac20000:13",    /* GICV — GIC Virtual CPU interface */
+            "0x4ac60000:13",    /* GICV — GIC Virtual CPU interface */
             "0x400e0000:12",    /* USART2 — debug serial */
             "0x482c0000:14",    /* DWMAC — Ethernet controller */
             "0x90000000:28",    /* VM RAM region (256MB) */

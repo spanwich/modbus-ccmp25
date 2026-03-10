@@ -37,13 +37,15 @@ WatchdogKicker — pets IWDG1 via SMC to OP-TEE every ~10s
 | `docs/gap_analysis_20260302.md` | Implementation readiness assessment against target architecture |
 | `docs/rcc_clock_investigation.md` | RCC RIFSC analysis (SEC/CID1, clocks OFF at boot) |
 | `docs/optee_smc_interfaces.md` | Complete OP-TEE SMC/PTA/SCMI reference for seL4 |
+| `docs/elfloader_bss_investigation.md` | AArch64 uImage BSS bug analysis (MASKED verdict) |
+| `docs/alignment_report_20260305.md` | Project instructions vs codebase verification |
 
 ## Platform Rules
 
 See `../../.claude/ccwmp255-sel4-rules.md` for hard-won platform-specific rules:
 - Timer register traps (VCPUFault under hypervisor mode)
 - IWDG is RIFSC-protected (no MMIO, must use SMC)
-- Elfloader BSS clearing bug (our fork fixes this)
+- Elfloader BSS: patched `64/crt0.S` to call `clear_bss()` for uImage (upstream bug fix)
 - ZF log level defaults to FATAL-only
 
 ## Build

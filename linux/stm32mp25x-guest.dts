@@ -28,6 +28,10 @@
 	 * from the linux_address_config in devices.camkes.
 	 */
 
+	aliases {
+		serial0 = &usart2;
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
