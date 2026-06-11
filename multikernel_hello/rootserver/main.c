@@ -63,26 +63,26 @@ static void delay(void)
  */
 #define PSCI_CPU_ON_AARCH64   0xc4000003ull
 #define CORE1_MPIDR           0x1ull
-/* Stage 2a: wake core 1 into the "core1 alive" stub the elfloader staged in
- * K1's surviving region (k_phys_start 0x98000000 + 0x400000). Once the full
- * trampoline lands, this becomes the trampoline entry that boots K1's kernel. */
-#define K1_CORE1_STUB_ENTRY   0x98400000ull
+/* Stage 2b: wake core 1 into the real hyp trampoline (mk_core1_trampoline in
+ * the elfloader), which enables the EL2 MMU and jumps into K1's seL4 kernel.
+ * Address is mk_core1_trampoline's phys addr from the elfloader build (objdump);
+ * stable across rootserver rebuilds since the elfloader .text precedes the CPIO.
+ * If the elfloader is rebuilt and this shifts, update it (objdump -t elfloader). */
+#define K1_CORE1_TRAMPOLINE   0x847260a0ull
 
-static void dispatch_core1(void)
+static uint64_t dispatch_core1(void)
 {
     seL4_ARM_SMCContext req = {0};
     seL4_ARM_SMCContext resp = {0};
 
     req.x0 = PSCI_CPU_ON_AARCH64;
     req.x1 = CORE1_MPIDR;
-    req.x2 = K1_CORE1_STUB_ENTRY;
-    req.x3 = 0; /* context id */
+    req.x2 = K1_CORE1_TRAMPOLINE;
+    req.x3 = 1; /* context id = K1 slot index (trampoline uses multikernel_entries[1]) */
 
-    put_str("[K0] booted-K0 dispatch: PSCI CPU_ON core1 -> 0x98400000 (stub)\n");
+    put_str("[K0] dispatch: PSCI CPU_ON core1 -> trampoline (K1)\n");
     seL4_ARM_SMC_Call(seL4_CapSMC, &req, &resp);
-    put_str("[K0] PSCI CPU_ON returned x0=");
-    put_dec(resp.x0);
-    put_str(" (0 = SUCCESS)\n");
+    return resp.x0;   /* printed later, after a quiet window for K1's output */
 }
 
 /*
@@ -113,7 +113,16 @@ int main(void)
     put_str("] hello rootserver up\n");
 
 #if KERNEL_ID == 0
-    dispatch_core1();
+    uint64_t psci_ret = dispatch_core1();
+    /* Quiet window: let core 1's trampoline diagnostic print to the shared UART
+     * without K0's ticks overwriting it. Keep petting IWDG1 meanwhile. */
+    for (int q = 0; q < 4; q++) {
+        pet_watchdog();
+        delay();
+    }
+    put_str("[K0] (resumed) PSCI CPU_ON ret=");
+    put_dec(psci_ret);
+    put_str("\n");
 #endif
 
     while (1) {

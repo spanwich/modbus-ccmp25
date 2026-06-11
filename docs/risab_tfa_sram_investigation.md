@@ -438,8 +438,42 @@ Foundation before the full trampoline + delivers visible [K1] console + watchdog
 `k_phys_start + 0x400000` (= 0x98400000, surviving). Rootserver wakes core 1 there. Stub runs
 NS/MMU-off: prints "[K1] core1 ALIVE via trampoline stub", loops petting IWDG1 (raw smc) +
 '.' heartbeat. Image: build-ccwmp25-mk-hello-k0-loadonly. Validates core 1 executes surviving
-NS code from K1's region (UART + SMC) with no firewall fault. Next: Stage 2b = build K1 boot
-page tables + enable MMU + jump to K1 kernel virt entry (generalize multikernel_secondary_startup).
+NS code from K1's region (UART + SMC) with no firewall fault.
+
+Stage 2a RESULT (hardware): `[K1] core1 ALIVE via trampoline stub` printed, '.' heartbeats
+interleave with [K0] ticks, NO `E/TC:` fault, no 32s reset. Confirmed. (UART output garbled =
+two cores writing the same UART unlocked — cosmetic.)
+
+### Stage 2b (built): real K1 kernel boot via hyp trampoline
+Key realization (verified): NO new page tables / no mk_map_kernel_window needed. The
+elfloader's `_boot_pgd_down` (built for K0, loaded by `arm_enable_hyp_mmu` into TTBR0_EL2)
+ALREADY maps K1's virtual entry 0x8098000000 -> 0x98000000, because K0/K1 share pv_offset
+0x8000000000 and K1's phys lies within the 1 GiB `_boot_pmd_up` already covers.
+
+`mk_core1_trampoline` (multikernel.c inline asm, @ elfloader phys 0x847260a0): set scratch
+sp (mk_secondary_stack[1]) -> `bl arm_enable_hyp_mmu` (EL2 MMU on) -> load K1 init_kernel ABI
+args from multikernel_entries[1] -> `br` K1 virt entry. Rootserver `dispatch_core1` now
+PSCI-CPU_ON's core 1 to 0x847260a0 (ctx=1). Reuses the PROVEN K0 hyp MMU path; relies on the
+elfloader region surviving K0 boot (minimal rootserver doesn't reclaim it).
+Image: build-ccwmp25-mk-hello-k0-loadonly.
+
+Expected: `[K1] Bootstrapping kernel` ... `[K1] hello rootserver up` + [K1] ticks alongside
+[K0] = full 1-kernel-per-core AMP. Failure modes to watch: elfloader region clobbered
+(→reserve it), core 1 not at EL2 (arm_enable_hyp_mmu writes sctlr_el2), or K1 arg/mapping
+mismatch (→ fault). Iteration 1 — flash + read log.
+
+### Stage 2b iteration 1 RESULT: fault at NEW addr 0xe000160 (set/way cache maint)
+Hardware: PSCI SUCCESS, then `E/TC:1 ... IADDR 0xe000160` (≠ 0xe002570; near BL31 SRAM base).
+No [K1] output ⇒ core 1 faulted in the trampoline before K1's kernel ran. Only new op vs the
+working Stage-2a stub = `arm_enable_hyp_mmu` → `bl flush_dcache` = **set/way D-cache maintenance
+(`dcache cisw`)**. A non-secure core doing whole-cache set/way touches TF-A/OP-TEE secure SRAM
+lines → RISAB. This is exactly what BF2's mmu.S avoids (`#ifdef CONFIG_PLAT_MLXBF2` → dsb;isb).
+
+### Fix (iteration 2): arm_enable_hyp_mmu_secondary (no set/way)
+Added to mmu-hyp.S — identical to arm_enable_hyp_mmu but replaces `bl flush_dcache` with
+`dsb sy; isb`. Safe: _boot tables + K1 image already coherent (K0's boot flush + elfloader
+by-VA clean_range). Trampoline now calls it. Addr still 0x847260a0; rootserver unchanged.
+Rebuilt build-ccwmp25-mk-hello-k0-loadonly. Flash + read log.
 
 ## Resolution direction (see plan)
 
