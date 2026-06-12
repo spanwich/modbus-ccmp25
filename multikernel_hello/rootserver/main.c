@@ -133,7 +133,9 @@ int main(void)
 #endif
 
     while (1) {
-        pet_watchdog();   /* keep IWDG1 alive (32s timeout) on every core that runs */
+#if KERNEL_ID == 0
+        pet_watchdog();   /* K0 owns OP-TEE watchdog SMCs; K1 stays out of secure world. */
+#endif
         put_str("[K");
         put_dec(KERNEL_ID);
         put_str("] tick ");

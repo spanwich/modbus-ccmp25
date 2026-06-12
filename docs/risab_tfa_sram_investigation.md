@@ -496,6 +496,12 @@ Build tracking for this experiment uses rootserver marker `ccwmp25-mk-prepared-s
 
 Expected hardware result: K1 reaches `[K1] ROOTSERVER_BUILD: ccwmp25-mk-prepared-secondary-01` and runs ticks alongside K0 without a RISAB/IAC panic at `IADDR 0xe000160`. The kernel mode is proven by the generated K1 config, not by an early kernel print, because UART via `KDEV_BASE` is unsafe before K1 installs its own kernel window.
 
+
+### Stage 2b iteration 3: K1 avoids OP-TEE watchdog SMC
+
+Iteration 2 proved the prepared-secondary cache gate is sufficient for K1 to boot: K1 reaches `Bootstrapping kernel`, drops to user space, prints `ROOTSERVER_BUILD`, and emits `[K1] tick 0`. The remaining RISAB panic appears after K1 user-space starts. The rebuilt K1 kernel contains no `dc cisw` / `dc csw` set/way cache-maintenance instructions, so the remaining secure-world transition in the path is the rootserver watchdog SMC.
+
+Next discriminator: K0 alone pets OP-TEE/IWDG1; K1 only prints ticks and does not call `seL4_ARM_SMC_Call`. If the RISAB panic disappears, K1's watchdog SMC path is the trigger. If it remains, the IAC is being latched asynchronously after K1 boot and merely reported later by OP-TEE.
 ## Resolution direction (see plan)
 
 - The faulting bank is TF-A's, **never** to be opened to non-secure. Fix = remove the
