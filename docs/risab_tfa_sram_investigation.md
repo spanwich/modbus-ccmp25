@@ -475,6 +475,27 @@ Added to mmu-hyp.S — identical to arm_enable_hyp_mmu but replaces `bl flush_dc
 by-VA clean_range). Trampoline now calls it. Addr still 0x847260a0; rootserver unchanged.
 Rebuilt build-ccwmp25-mk-hello-k0-loadonly. Flash + read log.
 
+### Stage 2b iteration 2: prepared-secondary kernel mode
+
+Instead of carrying a board-specific cache-maintenance patch, the next test uses a reusable ARM AArch64 kernel boot mode:
+
+- kernel branch: `spanwich/seL4 multikernel-main`
+- kernel commit: `a5de6ce2 feat(arm): add prepared secondary boot mode`
+- option: `KernelArmPreparedSecondaryBoot=ON` for K1 only
+- generated symbol: `CONFIG_ARM_PREPARED_SECONDARY_BOOT`
+- K0 remains on the default cache-maintenance path
+- elfloader secondary dispatch is disabled; K0 rootserver performs the controlled PSCI trampoline dispatch
+
+The mode disables set/way D-cache maintenance in the prepared secondary kernel instance and replaces those helper operations with barriers. The handoff contract is that the loader/trampoline side has already cleaned the K1 kernel image, rootserver, DTB, boot metadata, and any trampoline/page-table state by virtual address to PoC before entry.
+
+Build tracking for this experiment uses rootserver marker `ccwmp25-mk-prepared-secondary-01`. The build script verifies:
+
+- K1 config contains `CONFIG_ARM_PREPARED_SECONDARY_BOOT  1`
+- K0 config does not contain that symbol as enabled
+- both rootserver binaries contain the build marker
+
+Expected hardware result: K1 reaches `[K1] ROOTSERVER_BUILD: ccwmp25-mk-prepared-secondary-01` and runs ticks alongside K0 without a RISAB/IAC panic at `IADDR 0xe000160`. The kernel mode is proven by the generated K1 config, not by an early kernel print, because UART via `KDEV_BASE` is unsafe before K1 installs its own kernel window.
+
 ## Resolution direction (see plan)
 
 - The faulting bank is TF-A's, **never** to be opened to non-secure. Fix = remove the

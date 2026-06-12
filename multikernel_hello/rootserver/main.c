@@ -11,6 +11,10 @@
 #define KERNEL_ID 0
 #endif
 
+#ifndef ROOTSERVER_BUILD_ID
+#define ROOTSERVER_BUILD_ID "ccwmp25-mk-prepared-secondary-01"
+#endif
+
 static void put_str(const char *s)
 {
     while (*s) {
@@ -111,6 +115,9 @@ int main(void)
     put_str("[K");
     put_dec(KERNEL_ID);
     put_str("] hello rootserver up\n");
+    put_str("[K");
+    put_dec(KERNEL_ID);
+    put_str("] ROOTSERVER_BUILD: " ROOTSERVER_BUILD_ID "\n");
 
 #if KERNEL_ID == 0
     uint64_t psci_ret = dispatch_core1();
