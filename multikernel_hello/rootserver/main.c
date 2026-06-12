@@ -12,7 +12,7 @@
 #endif
 
 #ifndef ROOTSERVER_BUILD_ID
-#define ROOTSERVER_BUILD_ID "ccwmp25-mk-k0-nosmc-window-01"
+#define ROOTSERVER_BUILD_ID "ccwmp25-mk-k1-no-global-icache-01"
 #endif
 
 static void put_str(const char *s)

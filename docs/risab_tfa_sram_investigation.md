@@ -517,3 +517,9 @@ Next discriminator: K0 alone pets OP-TEE/IWDG1; K1 only prints ticks and does no
 - seL4 (editable): `tools/seL4/elfloader-tool/src/arch-arm/{multikernel.c,sys_boot.c}`,
   `tools/seL4/elfloader-tool/src/arch-arm/64/{mmu.c,multikernel_trampoline.S}`,
   `projects/sel4_ccwmp25/multikernel_hello/{settings.cmake,build-stm32mp25x.sh}`.
+
+### Stage 2b follow-up: K1 no global I-cache maintenance
+
+Hardware log for `ROOTSERVER_BUILD: ccwmp25-mk-k0-nosmc-window-01` still trips RISAB during K0's post-dispatch no-SMC quiet window. The UART sequence reaches `K1:2A` but not `B`, which localizes the fault to the K1 elfloader trampoline before it enters seL4. Since K1 rootserver never runs and K0 is deliberately not making an SMC in that window, the remaining suspect is the secondary EL2 MMU/cache enable helper, not OP-TEE watchdog servicing.
+
+Diagnostic image `ROOTSERVER_BUILD: ccwmp25-mk-k1-no-global-icache-01` keeps the primary `arm_enable_hyp_mmu` path unchanged, but changes the prepared-secondary `arm_enable_hyp_mmu_secondary` path to avoid whole-cache maintenance entirely: no set/way D-cache operation and no global `ic iallu` / `ic ialluis`. Those points are replaced with ordering barriers. If this reaches `B`, the RISAB fault is caused by global instruction-cache maintenance on the non-secure secondary core. If it still faults before `B`, the next discriminator should split markers around `disable_mmu`, TTBR/TLBI, and SCTLR enable inside the same helper.
