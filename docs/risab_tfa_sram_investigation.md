@@ -527,3 +527,9 @@ Diagnostic image `ROOTSERVER_BUILD: ccwmp25-mk-k1-no-global-icache-01` keeps the
 ### Stage 2b follow-up: secondary MMU step markers
 
 Diagnostic image `ROOTSERVER_BUILD: ccwmp25-mk-secmmu-markers-01` adds single-character UART markers inside `arm_enable_hyp_mmu_secondary` to identify the exact completed step before RISAB fires. Marker meaning: `0` helper entered and stack frame installed; `1` initial `dsb sy; isb` complete; `2` `disable_mmu sctlr_el2` complete; `3` pre-MMU no-global-icache barrier complete; `4` `MAIR_EL2`/`TCR_EL2` programmed; `5` `TTBR0_EL2` programmed; `6` first `tlbi alle2is` complete; `7` `enable_mmu sctlr_el2` complete; `8` post-MMU no-global-icache barrier complete; `9` second `tlbi alle2is` complete; `R` returning to the trampoline. The last marker seen before OP-TEE reports RISAB is the evidence for the next narrowing step.
+
+### Stage 2b follow-up: non-UART handoff timing trace
+
+Diagnostic image `ROOTSERVER_BUILD: ccwmp25-mk-trace-e100k-s0-01` removes normal-path UART prints from the K1 trampoline and secondary MMU helper. K0 owns a one-page trace buffer at rootserver virtual `0x41f000`; elfloader converts that to K0 rootserver physical memory and K1 writes fixed 128-byte trace slots directly from EL2. K0 clears the page before `PSCI CPU_ON`, records slots 1/2 around the SMC, waits in the no-SMC quiet window, then dumps all populated slots.
+
+Trace slots: 1 K0 before `CPU_ON`; 2 K0 after `CPU_ON`; 10 K1 trampoline after stack/VBAR; 11 before entry delay; 12 after entry delay; 20 secondary helper entry; 21 initial barrier; 22 `disable_mmu`; 23 pre-MMU barrier; 24 `MAIR/TCR`; 25 `TTBR0`; 26 first `TLBI`; 27 `SCTLR_EL2` enable; 28 post-MMU barrier; 29 second `TLBI`; 30 before branch to K1 kernel; 31 K1 rootserver local entry record. The first image uses entry delay `100000` counter ticks and step delay `0`.
