@@ -12,7 +12,7 @@
 #endif
 
 #ifndef ROOTSERVER_BUILD_ID
-#define ROOTSERVER_BUILD_ID "ccwmp25-mk-prepared-secondary-01"
+#define ROOTSERVER_BUILD_ID "ccwmp25-mk-k0-nosmc-window-01"
 #endif
 
 static void put_str(const char *s)
@@ -122,11 +122,13 @@ int main(void)
 #if KERNEL_ID == 0
     uint64_t psci_ret = dispatch_core1();
     /* Quiet window: let core 1's trampoline diagnostic print to the shared UART
-     * without K0's ticks overwriting it. Keep petting IWDG1 meanwhile. */
+     * without K0's ticks overwriting it. Deliberately avoid OP-TEE SMCs here
+     * so RISAB timing can distinguish K1 boot from secure-world re-entry. */
+    put_str("[K0] post-dispatch no-SMC quiet window\n");
     for (int q = 0; q < 4; q++) {
-        pet_watchdog();
         delay();
     }
+    put_str("[K0] quiet window done\n");
     put_str("[K0] (resumed) PSCI CPU_ON ret=");
     put_dec(psci_ret);
     put_str("\n");

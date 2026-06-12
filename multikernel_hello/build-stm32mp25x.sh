@@ -8,7 +8,7 @@ VENV="$WORKSPACE/sel4-dev-env"
 K1_BUILD="$WORKSPACE/build-ccwmp25-mk-hello-k1"
 K0_BUILD="$WORKSPACE/build-ccwmp25-mk-hello-k0"
 FINAL_IMAGE="$K0_BUILD/images/rootserver_hello-image-arm-stm32mp25x"
-ROOTSERVER_BUILD_ID="ccwmp25-mk-prepared-secondary-01"
+ROOTSERVER_BUILD_ID="ccwmp25-mk-k0-nosmc-window-01"
 
 if [ "${1:-build}" = "clean" ]; then
     rm -rf "$K1_BUILD" "$K0_BUILD"
